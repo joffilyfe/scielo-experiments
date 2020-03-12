@@ -2,3 +2,4 @@
 .venv/
 resultsdos/
 .ipynb_checkpoints
+*.csv
