@@ -65,21 +65,38 @@ async def access_doi_website(session, data, counter, output):
         "error": None,
     }
 
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0"
+    }
+
     for name, doi in DOIs.items():
         if doi is None or len(doi) == 0:
             continue
 
         try:
-            async with session.get("https://doi.org/%s" % doi) as response:
-                if response.status == 200:
+            async with session.get("https://doi.org/%s" % doi, headers=headers) as response:
+                if response.status in (200, 301, 302) or response.status >= 500:
                     result["found_by_%s" % name] = 1
                     result["redirect_url"] = str(response.url)
                     result["doi"] = doi
+
+                    if response.status >= 500:
+                        result["error"] = "Status code %s" % response.status
+
                     break
+
+                elif response.status == 404 and "doi.org" not in str(response.url):
+                    result["found_by_%s" % name] = 1
+                    result["redirect_url"] = str(response.url)
+                    result["doi"] = doi
+                    result["error"] = "Status code %s" % response.status
+
         except Exception as exc:
             logger.error("Could not access doi for %s", pid)
             result["error"] = str(exc)
             result["found_by_%s" % name] = 1
+            result["doi"] = doi
+            break
 
     await write_csv(result, output)
     counter.inc()
